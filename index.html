@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLIMBER HUD | IoT Tracker</title>
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-red: #ff004c;
+            --dark-bg: #0a0b10;
+            --panel-bg: rgba(16, 18, 27, 0.9);
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+            transition: background-color 0.5s;
+        }
+
+        .emergency-mode {
+            background-color: rgba(255, 0, 76, 0.1) !important;
+            animation: danger-pulse 2s infinite;
+        }
+
+        @keyframes danger-pulse {
+            0% { border-color: var(--neon-red); }
+            50% { border-color: rgba(255, 0, 76, 0.2); }
+            100% { border-color: var(--neon-red); }
+        }
+
+        .header {
+            text-align: left;
+            border-left: 5px solid var(--neon-blue);
+            padding-left: 20px;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+        }
+
+        .header h1 { margin: 0; font-size: 2.2em; color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); }
+        .header p { margin: 5px 0; opacity: 0.7; font-size: 0.9em; }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--panel-bg);
+            border: 1px solid rgba(0, 242, 255, 0.2);
+            padding: 20px;
+            position: relative;
+            clip-path: polygon(0 0, 100% 0, 100% 85%, 85% 100%, 0 100%);
+            transition: border-color 0.3s;
+        }
+
+        .card:hover { border-color: var(--neon-blue); }
+
+        .label { font-size: 0.8em; color: var(--neon-blue); text-transform: uppercase; opacity: 0.8; }
+        .value { font-size: 3em; font-weight: bold; margin: 10px 0; font-family: 'Orbitron', sans-serif; }
+        .unit { font-size: 0.4em; margin-left: 5px; }
+
+        #status-panel {
+            grid-column: 1 / -1;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            letter-spacing: 3px;
+            border: 1px solid var(--neon-blue);
+            background: rgba(0, 242, 255, 0.05);
+            transition: all 0.5s;
+        }
+
+        .status-normal { color: var(--neon-blue); }
+        .status-alert { 
+            color: var(--neon-red); 
+            border-color: var(--neon-red) !important;
+            background: rgba(255, 0, 76, 0.1) !important;
+        }
+
+        .map-btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid var(--neon-blue);
+            color: var(--neon-blue);
+            text-decoration: none;
+            text-align: center;
+            margin-top: 10px;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        .map-btn:hover { background: var(--neon-blue); color: black; }
+
+        .footer { margin-top: 40px; font-size: 0.7em; opacity: 0.4; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>IoT based Mountain climber health & Position Tracking</h1>
+        <p>EMERGENCY RESPONSE HUD // Project Apex</p>
+    </div>
+
+    <div id="status-panel" class="status-normal">SYSTEM ONLINE // NO THREATS DETECTED</div>
+
+    <div class="dashboard-grid">
+        <div id="vitalCard" class="card">
+            <div class="label">VITAL: HEART_RATE</div>
+            <div class="value" id="bpm">--<span class="unit">BPM</span></div>
+        </div>
+
+        <div id="physicalCard" class="card">
+            <div class="label">PHYSICAL: G_FORCE</div>
+            <div class="value" id="force">--<span class="unit">G-UNIT</span></div>
+        </div>
+
+        <div id="navCard" class="card">
+            <div class="label">NAV: COORDINATES</div>
+            <div class="value" style="font-size: 1.2em; min-height: 80px;" id="coords">WAITING FOR FIX...</div>
+            <a id="mapLink" href="#" target="_blank" class="map-btn">VIEW SATELLITE FEED</a>
+        </div>
+    </div>
+
+    <div class="footer">ENCRYPTED DATA STREAM VIA THINGSPEAK CLOUD // ID: 3321243</div>
+
+    <script>
+        const channelID = "3321243"; 
+        
+        // Define the emergency alarm sound
+        const alarmSound = new Audio("http://myinstants.com/media/sounds/submarine-dive-horn.mp3");
+        alarmSound.loop = true; // Make it play forever until the fall is reset
+
+        function updateHUD() {
+            fetch(`https://api.thingspeak.com/channels/${channelID}/feeds.json?results=1`)
+            .then(response => response.json())
+            .then(data => {
+                const feed = data.feeds[0];
+                const bpm = feed.field1 || "0";
+                const force = feed.field2 || "10";
+                const lat = feed.field3;
+                const lon = feed.field4;
+                const isFall = feed.field5;
+
+                document.getElementById('bpm').innerHTML = `${bpm}<span class="unit">BPM</span>`;
+                document.getElementById('force').innerHTML = `${(force/10).toFixed(1)}<span class="unit">G</span>`;
+
+                const statusPanel = document.getElementById('status-panel');
+                const vitalCard = document.getElementById('vitalCard');
+                const physicalCard = document.getElementById('physicalCard');
+                const navCard = document.getElementById('navCard');
+                const mapBtn = document.getElementById('mapLink');
+
+                // If Fall Detected (isFall == 1)
+                if(isFall == "1") {
+                    statusPanel.innerText = "!!! WARNING: CLIMBER FALL DETECTED !!!";
+                    statusPanel.className = "status-alert";
+                    document.body.className = "emergency-mode";
+                    vitalCard.style.borderColor = "#ff004c";
+                    physicalCard.style.borderColor = "#ff004c";
+                    navCard.style.borderColor = "#ff004c";
+                    mapBtn.style.borderColor = "#ff004c";
+                    mapBtn.style.color = "#ff004c";
+                    
+                    // Start the Audible Alarm
+                    // Note: Most modern browsers require you to click the page once
+                    // before it can play sound automatically.
+                    alarmSound.play().catch(e => console.log("Sound waiting for user click..."));
+                } else {
+                    statusPanel.innerText = "SYSTEM ONLINE // NO THREATS DETECTED";
+                    statusPanel.className = "status-normal";
+                    document.body.className = "";
+                    vitalCard.style.borderColor = "";
+                    physicalCard.style.borderColor = "";
+                    navCard.style.borderColor = "";
+                    mapBtn.style.borderColor = "";
+                    mapBtn.style.color = "";
+                    
+                    // Stop the Audible Alarm
+                    alarmSound.pause();
+                    alarmSound.currentTime = 0; // Reset to the start
+                }
+
+                if(lat && lon) {
+                    document.getElementById('coords').innerText = `${lat}\n${lon}`;
+                    document.getElementById('mapLink').href = `https://www.google.com/maps?q=${lat},${lon}`;
+                }
+            })
+            .catch(e => console.log("Re-syncing..."));
+        }
+
+        setInterval(updateHUD, 15000); // Check every 15 seconds
+        updateHUD(); // Initial load
+    </script>
+</body>
+</html>
