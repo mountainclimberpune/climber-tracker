@@ -5,91 +5,72 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IoT MOUNTAIN CLIMBER TRACKER</title>
     <style>
-        :root {
-            --neon-blue: #00f2ff;
-            --neon-red: #ff004c;
-            --dark-bg: #0a0b10;
-            --panel-bg: rgba(16, 18, 27, 0.9);
-        }
+        :root { --neon-blue: #00f2ff; --neon-red: #ff004c; --dark-bg: #0a0b10; }
+        body { background-color: var(--dark-bg); color: white; font-family: 'Courier New', monospace; margin: 0; padding: 20px; text-align: center; }
+        
+        .emergency-active { background-color: #7b0000 !important; animation: bg-blink 0.5s infinite; }
+        @keyframes bg-blink { 0% { background-color: #7b0000; } 50% { background-color: #ff0000; } 100% { background-color: #7b0000; } }
 
-        body {
-            background-color: var(--dark-bg);
-            color: white;
-            font-family: 'Courier New', Courier, monospace;
-            margin: 0;
-            padding: 20px;
-            transition: background 0.5s;
-        }
-
-        /* EMERGENCY FLASHING RED */
-        .emergency-active {
-            background-color: #7b0000 !important;
-            animation: bg-blink 1s infinite;
-        }
-
-        @keyframes bg-blink {
-            0% { background-color: #7b0000; }
-            50% { background-color: #ff0000; }
-            100% { background-color: #7b0000; }
-        }
-
-        .header { border-left: 5px solid var(--neon-blue); padding-left: 20px; margin-bottom: 30px; }
-        .header h1 { margin: 0; font-size: 1.6em; color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); }
-
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
-        .card { background: var(--panel-bg); border: 1px solid rgba(0, 242, 255, 0.2); padding: 20px; clip-path: polygon(0 0, 100% 0, 100% 85%, 85% 100%, 0 100%); }
+        .card { background: rgba(16, 18, 27, 0.9); border: 1px solid rgba(0, 242, 255, 0.2); padding: 20px; margin: 10px; display: inline-block; width: 250px; }
         .value { font-size: 3em; font-weight: bold; }
-
-        #status-panel { padding: 15px; text-align: center; font-weight: bold; border: 1px solid var(--neon-blue); margin-bottom: 20px; }
-        .status-alert { color: white; background: var(--neon-red); border-color: white !important; }
-
-        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 999; display: flex; align-items: center; justify-content: center; }
-        #start-btn { padding: 20px 50px; font-size: 20px; background: var(--neon-blue); border: none; cursor: pointer; font-weight: bold; clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%); }
+        #status-panel { padding: 15px; border: 1px solid var(--neon-blue); margin-bottom: 20px; font-weight: bold; }
+        
+        /* Overlay */
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        button { padding: 20px 50px; font-size: 20px; background: var(--neon-blue); border: none; cursor: pointer; font-weight: bold; margin: 10px; }
+        #test-btn { background: #444; color: white; font-size: 14px; padding: 10px; }
     </style>
 </head>
 <body>
 
     <div id="start-overlay">
-        <button id="start-btn" onclick="initHUD()">ACTIVATE LIVE HUD & ALARM</button>
+        <h2 style="color:var(--neon-blue)">SYSTEM READY</h2>
+        <button onclick="initHUD()">ACTIVATE MISSION CONTROL</button>
+        <p style="font-size: 12px; opacity: 0.6;">Click to enable Live Data & Emergency Audio</p>
     </div>
 
-    <div class="header">
-        <h1>IoT based Mountain climber health & Position Tracking</h1>
-    </div>
-
-    <div id="status-panel">SYSTEM STANDBY</div>
+    <h1>IoT based Mountain climber health & Position Tracking</h1>
+    <div id="status-panel">AWAITING CONNECTION...</div>
+    
+    <button id="test-btn" onclick="playEmergencyBeep()">TEST ALARM SOUND</button>
 
     <div class="dashboard-grid">
+        <div class="card"><div>HEART RATE</div><div class="value" id="bpm">--</div></div>
+        <div class="card"><div>FORCE</div><div class="value" id="force">--</div></div>
         <div class="card">
-            <div>VITAL: HEART_RATE</div>
-            <div class="value" id="bpm">--</div>
-        </div>
-        <div class="card">
-            <div>PHYSICAL: FORCE</div>
-            <div class="value" id="force">--</div>
-        </div>
-        <div class="card">
-            <div>NAV: COORDINATES</div>
-            <div id="coords" style="font-size: 0.9em; margin: 10px 0;">AWAITING SIGNAL...</div>
-            <a id="mapLink" href="#" target="_blank" style="color:var(--neon-blue); text-decoration:none;">[ VIEW SATELLITE FEED ]</a>
+            <div>GPS</div>
+            <div id="coords" style="font-size: 0.8em; margin: 10px 0;">NO FIX</div>
+            <a id="mapLink" href="#" target="_blank" style="color:var(--neon-blue)">[ GOOGLE MAPS ]</a>
         </div>
     </div>
 
     <script>
         const channelID = "3321243";
-        // Base64 encoded high-pitched emergency beep (No external file needed)
-        const alarm = new Audio("data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YV9vT18Ae3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3t7e3s=");
-        alarm.loop = true;
-        
+        let audioCtx = null;
+        let alarmInterval = null;
         let isEmergency = false;
 
+        // 1. Initialize the Audio Context on first click
         function initHUD() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             document.getElementById('start-overlay').style.display = 'none';
             document.getElementById('status-panel').innerText = "SYSTEM ONLINE // MONITORING";
-            // Prime audio
-            alarm.play().then(() => { alarm.pause(); }).catch(() => {});
             fetchData();
             setInterval(fetchData, 15000);
+        }
+
+        // 2. Function to generate a raw electronic beep
+        function playEmergencyBeep() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "square"; // Futuristic "beep" sound
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High pitch
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.2); // Beep duration 0.2s
         }
 
         function fetchData() {
@@ -101,35 +82,30 @@
                 document.getElementById('force').innerText = last.field2 || "10";
                 
                 if(last.field3 && last.field4) {
-                    document.getElementById('coords').innerText = `${last.field3}, ${last.field4}`;
+                    document.getElementById('coords').innerText = last.field3 + ", " + last.field4;
                     document.getElementById('mapLink').href = `https://www.google.com/maps?q=${last.field3},${last.field4}`;
                 }
 
-                // If fall status (Field 5) is 1
-                if(last.field5 == "1") {
-                    triggerAlarm();
+                if(last.field5 == "1" && !isEmergency) {
+                    triggerEmergency();
                 }
             });
         }
 
-        function triggerAlarm() {
-            if(isEmergency) return;
+        function triggerEmergency() {
             isEmergency = true;
-            
             document.body.classList.add('emergency-active');
-            document.getElementById('status-panel').innerText = "!!! CRITICAL: FALL DETECTED !!!";
-            document.getElementById('status-panel').classList.add('status-alert');
-            alarm.play();
+            document.getElementById('status-panel').innerText = "!!! FALL DETECTED !!!";
+            
+            // Repeat the beep every 0.5 seconds
+            alarmInterval = setInterval(playEmergencyBeep, 500);
 
-            // Hold for 30 seconds to bypass ThingSpeak delay
             setTimeout(() => {
+                clearInterval(alarmInterval);
                 isEmergency = false;
                 document.body.classList.remove('emergency-active');
                 document.getElementById('status-panel').innerText = "SYSTEM ONLINE // MONITORING";
-                document.getElementById('status-panel').classList.remove('status-alert');
-                alarm.pause();
-                alarm.currentTime = 0;
-            }, 30000);
+            }, 30000); // 30 second alert
         }
     </script>
 </body>
